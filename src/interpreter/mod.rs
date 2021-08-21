@@ -15,6 +15,15 @@ pub enum Value {
     Nil,
 }
 
+impl Value {
+    fn truthy(&self) -> bool {
+        match self {
+            Value::Int(x) => *x != 0,
+            Value::Nil => false,
+        }
+    }
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -22,23 +31,6 @@ impl fmt::Display for Value {
             Value::Nil => write!(f, "nil"),
         }
     }
-}
-
-fn accumulate<A, T>(
-    args: Vec<Value>,
-    extract: impl Fn(Value) -> Option<T>,
-    init: A,
-    combine: impl Fn(A, T) -> A,
-    wrap: impl Fn(A) -> Value,
-) -> Value {
-    let mut acc = init;
-    for x in args {
-        match extract(x) {
-            None => return Value::Nil,
-            Some(v) => acc = combine(acc, v),
-        }
-    }
-    wrap(acc)
 }
 
 fn new_parser<'a>(code: &'a Code) -> parser::Parser<'a> {
@@ -62,9 +54,27 @@ impl Interpreter {
         self.values.insert(def.ident, val);
     }
 
-    fn call(&mut self, ident: Ident, args: Vec<Value>) -> Value {
+    fn accumulate<A, T>(
+        &mut self,
+        args: Vec<Expr>,
+        extract: impl Fn(Value) -> Option<T>,
+        init: A,
+        combine: impl Fn(A, T) -> A,
+        wrap: impl Fn(A) -> Value,
+    ) -> Value {
+        let mut acc = init;
+        for x in args {
+            match extract(self.eval_expr(x)) {
+                None => return Value::Nil,
+                Some(v) => acc = combine(acc, v),
+            }
+        }
+        wrap(acc)
+    }
+
+    fn call(&mut self, ident: Ident, args: Vec<Expr>) -> Value {
         match ident.0.as_str() {
-            "+" => accumulate(
+            "+" => self.accumulate(
                 args,
                 |x| match x {
                     Value::Int(i) => Some(i),
@@ -74,7 +84,7 @@ impl Interpreter {
                 |x, y| x + y,
                 |x| Value::Int(x),
             ),
-            "*" => accumulate(
+            "*" => self.accumulate(
                 args,
                 |x| match x {
                     Value::Int(i) => Some(i),
@@ -84,7 +94,7 @@ impl Interpreter {
                 |x, y| x * y,
                 |x| Value::Int(x),
             ),
-            "-" => accumulate(
+            "-" => self.accumulate(
                 args,
                 |x| match x {
                     Value::Int(i) => Some(i),
@@ -97,7 +107,7 @@ impl Interpreter {
                 },
                 |x| Value::Int(x.unwrap_or(0)),
             ),
-            "/" => accumulate(
+            "/" => self.accumulate(
                 args,
                 |x| match x {
                     Value::Int(i) => Some(i),
@@ -110,6 +120,18 @@ impl Interpreter {
                 },
                 |x| Value::Int(x.unwrap_or(1)),
             ),
+            "if" => {
+                let condition = args
+                    .get(0)
+                    .map_or(Value::Nil, |x| self.eval_expr(x.clone()));
+                if condition.truthy() {
+                    args.get(1)
+                        .map_or(Value::Nil, |x| self.eval_expr(x.clone()))
+                } else {
+                    args.get(2)
+                        .map_or(Value::Nil, |x| self.eval_expr(x.clone()))
+                }
+            }
             _ => Value::Nil,
         }
     }
@@ -119,10 +141,7 @@ impl Interpreter {
             Expr::Nil => Value::Nil,
             Expr::Int(i) => Value::Int(i),
             Expr::Ident(i) => self.values.get(&i).unwrap_or(&Value::Nil).clone(),
-            Expr::Call(i, args) => {
-                let arg_values: Vec<Value> = args.into_iter().map(|a| self.eval_expr(a)).collect();
-                self.call(i, arg_values)
-            }
+            Expr::Call(i, args) => self.call(i, args),
         }
     }
 
