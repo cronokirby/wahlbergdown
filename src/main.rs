@@ -29,6 +29,14 @@ enum Command {
     },
 }
 
+fn lex_and_stop(input_file: &Path) {
+    let src = fs::read_to_string(input_file).expect("failed to read input file");
+    let tokens = lexer::lex(&src);
+    for tok in tokens {
+        println!("{:?}", tok);
+    }
+}
+
 fn run(input_file: &Path) {
     let src = fs::read_to_string(input_file).expect("failed to read input file");
     print!("{}", src)
@@ -37,7 +45,7 @@ fn run(input_file: &Path) {
 fn main() {
     let args = Command::from_args();
     match args {
-        Command::Lex { .. } => eprintln!("unimplemented"),
+        Command::Lex { input_file } => lex_and_stop(&input_file),
         Command::Parse { .. } => eprintln!("unimplemented"),
         Command::Run { input_file } => run(&input_file),
     }
