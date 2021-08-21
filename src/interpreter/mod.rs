@@ -54,12 +54,12 @@ impl Interpreter {
     }
 
     pub fn definition(&mut self, code: Code) -> Result<(), String> {
-        let def = new_parser(&code).parse_definition()?;
+        let def = new_parser(&code).top_level_definition()?;
         Ok(self.eval_definition(def))
     }
 
     pub fn expr(&mut self, code: Code) -> Result<Value, String> {
-        let expr = new_parser(&code).parse_expr()?;
+        let expr = new_parser(&code).top_level_expr()?;
         Ok(self.eval_expr(expr))
     }
 }

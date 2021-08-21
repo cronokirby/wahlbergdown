@@ -43,7 +43,7 @@ impl<'a> Parser<'a> {
     fn next(&mut self) -> ParseResult<Option<Token>> {
         match self.tokens.next() {
             None => Ok(None),
-            Some(t) => Ok(Some(t?))
+            Some(t) => Ok(Some(t?)),
         }
     }
 
@@ -60,7 +60,14 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_expr(&mut self) -> ParseResult<Expr> {
+    fn expect_end(&mut self) -> ParseResult<()> {
+        match self.next()? {
+            None => Ok(()),
+            Some(tok) => Err(format!("unexpected token {:?}", tok)),
+        }
+    }
+
+    fn expr(&mut self) -> ParseResult<Expr> {
         match self.peek()? {
             None => Err(format!("unexpected EOF")),
             Some(Token::Identifier(_)) => match self.next()? {
@@ -80,7 +87,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_definition(&mut self) -> ParseResult<Definition> {
+    fn definition(&mut self) -> ParseResult<Definition> {
         let ident = self.expect(|x| match x {
             Token::Identifier(i) => Some(Ident(i)),
             _ => None,
@@ -89,7 +96,19 @@ impl<'a> Parser<'a> {
             Token::Is => Some(()),
             _ => None,
         })?;
-        let expr = self.parse_expr()?;
+        let expr = self.expr()?;
         Ok(Definition { ident, expr })
+    }
+
+    pub fn top_level_expr(&mut self) -> ParseResult<Expr> {
+        let expr = self.expr()?;
+        self.expect_end()?;
+        Ok(expr)
+    }
+
+    pub fn top_level_definition(&mut self) -> ParseResult<Definition> {
+        let def = self.definition()?;
+        self.expect_end()?;
+        Ok(def)
     }
 }
