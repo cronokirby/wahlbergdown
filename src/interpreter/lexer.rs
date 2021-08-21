@@ -3,8 +3,10 @@ use std::{iter::Peekable, str::Chars};
 /// Represents a Token produced by our lexer.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    // The `is` keyword
+    /// The `is` keyword
     Is,
+    /// The `nil` keyword
+    Nil,
     /// An identifier
     Identifier(String),
     // A signed integer
@@ -76,6 +78,7 @@ impl<'a> Iterator for Lexer<'a> {
                 let ident = self.continue_identifier(c);
                 let tok = match ident.as_str() {
                     "is" => Token::Is,
+                    "nil" => Token::Nil,
                     _ => Token::Identifier(ident),
                 };
                 return Some(tok);
