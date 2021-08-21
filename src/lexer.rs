@@ -1,3 +1,4 @@
+use std::mem;
 use std::str::Chars;
 
 use peekmore::{PeekMore, PeekMoreIterator};
@@ -26,6 +27,8 @@ struct Lexer<'a> {
     pos: usize,
     /// Used to a accumulate a raw string token
     raw_acc: String,
+    /// This may contain a buffered output token
+    produced: Option<Token>,
 }
 
 impl<'a> Lexer<'a> {
@@ -35,6 +38,15 @@ impl<'a> Lexer<'a> {
             src: src.chars().peekmore(),
             pos: 0,
             raw_acc: String::new(),
+            produced: None,
+        }
+    }
+
+    fn take_raw(&mut self) -> Option<Token> {
+        if self.raw_acc.is_empty() {
+            None
+        } else {
+            Some(Token::Raw(mem::take(&mut self.raw_acc)))
         }
     }
 
@@ -53,15 +65,19 @@ impl<'a> Iterator for Lexer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         use Token::*;
 
+        if let Some(tok) = mem::take(&mut self.produced) {
+            return Some(tok);
+        }
+
         loop {
             let next = match self.src.next() {
-                None => return None,
+                None => return self.take_raw(),
                 Some(c) => c,
             };
 
-            match next {
-                '\n' => return Some(Newline),
-                '`' => return Some(Tick),
+            let produced = match next {
+                '\n' => Some(Newline),
+                '`' => Some(Tick),
                 '<' => {
                     if self.src.peek_nth(0).map_or(false, |x| *x == '!')
                         && self.src.peek_nth(1).map_or(false, |x| *x == '-')
@@ -72,6 +88,8 @@ impl<'a> Iterator for Lexer<'a> {
                         self.src.next();
 
                         return Some(CommentOpen);
+                    } else {
+                        None
                     }
                 }
                 '-' => {
@@ -81,12 +99,22 @@ impl<'a> Iterator for Lexer<'a> {
                         self.src.next();
                         self.src.next();
 
-                        return Some(CommentClose);
+                        Some(CommentClose)
+                    } else {
+                        None
                     }
                 }
-                _ => {}
+                _ => None,
+            };
+            if let Some(tok) = produced {
+                if let Some(raw) = self.take_raw() {
+                    self.produced = Some(tok);
+                    return Some(raw);
+                } else {
+                    return Some(tok);
+                }
             }
-            self.raw_acc.push(next)
+            self.raw_acc.push(next);
         }
     }
 }
