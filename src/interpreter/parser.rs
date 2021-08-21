@@ -32,23 +32,26 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn peek(&mut self) -> Option<&Token> {
-        self.tokens.peek()
+    fn peek(&mut self) -> ParseResult<Option<&Token>> {
+        match self.tokens.peek() {
+            None => Ok(None),
+            Some(Err(e)) => Err(e.clone()),
+            Some(Ok(t)) => Ok(Some(t)),
+        }
     }
 
-    fn done(&mut self) -> bool {
-        self.peek().is_none()
-    }
-
-    fn next(&mut self) -> Option<Token> {
-        self.tokens.next()
+    fn next(&mut self) -> ParseResult<Option<Token>> {
+        match self.tokens.next() {
+            None => Ok(None),
+            Some(t) => Ok(Some(t?))
+        }
     }
 
     fn expect<T, F>(&mut self, matcher: F) -> ParseResult<T>
     where
         F: Fn(Token) -> Option<T>,
     {
-        match self.next() {
+        match self.next()? {
             None => Err(format!("unexpected EOF")),
             Some(tok) => match matcher(tok.clone()) {
                 None => Err(format!("unexpected token {:?}", tok)),
@@ -58,19 +61,19 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_expr(&mut self) -> ParseResult<Expr> {
-        match self.peek() {
+        match self.peek()? {
             None => Err(format!("unexpected EOF")),
-            Some(Token::Identifier(_)) => match self.next() {
+            Some(Token::Identifier(_)) => match self.next()? {
                 Some(Token::Identifier(i)) => Ok(Expr::Ident(Ident(i))),
                 _ => unreachable!(),
             },
             Some(Token::Int(i)) => {
                 let expr = Expr::Int(*i);
-                self.next();
+                self.next()?;
                 Ok(expr)
             }
             Some(Token::Nil) => {
-                self.next();
+                self.next()?;
                 Ok(Expr::Nil)
             }
             Some(tok) => Err(format!("unexpected token {:?}", tok)),

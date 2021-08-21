@@ -59,7 +59,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Token;
+    type Item = Result<Token, String>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_whitespace();
@@ -72,7 +72,7 @@ impl<'a> Iterator for Lexer<'a> {
         match next {
             c if c.is_digit(10) => {
                 let lit = self.continue_int_lit(c);
-                return Some(Token::Int(lit));
+                return Some(Ok(Token::Int(lit)));
             }
             c if c.is_alphabetic() || c == '_' => {
                 let ident = self.continue_identifier(c);
@@ -81,9 +81,9 @@ impl<'a> Iterator for Lexer<'a> {
                     "nil" => Token::Nil,
                     _ => Token::Identifier(ident),
                 };
-                return Some(tok);
+                return Some(Ok(tok));
             }
-            _ => panic!("I need to implement errors"),
+            c => return Some(Err(format!("unexpected character: `{}`", c))),
         }
     }
 }
