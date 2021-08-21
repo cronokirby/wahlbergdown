@@ -18,9 +18,22 @@ pub enum Token {
     Raw(String),
 }
 
+impl Token {
+    /// push_to appends the contents of this token to a string.
+    pub fn push_to(&self, acc: &mut String) {
+        match self {
+            Token::CommentOpen => acc.push_str("<!--"),
+            Token::CommentClose => acc.push_str("-->"),
+            Token::Tick => acc.push('`'),
+            Token::Newline => acc.push('\n'),
+            Token::Raw(s) => acc.push_str(s),
+        }
+    }
+}
+
 /// A Lexer uses our source code to emit tokens.
 #[derive(Debug)]
-struct Lexer<'a> {
+pub struct Lexer<'a> {
     /// The source code for our program.
     src: PeekMoreIterator<Chars<'a>>,
     /// The current position in our source code.
@@ -33,7 +46,7 @@ struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     /// Create a new lexer with some source code.
-    fn new(src: &'a str) -> Self {
+    pub fn new(src: &'a str) -> Self {
         Lexer {
             src: src.chars().peekmore(),
             pos: 0,
@@ -55,8 +68,6 @@ impl<'a> Iterator for Lexer<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        use Token::*;
-
         if let Some(tok) = mem::take(&mut self.produced) {
             return Some(tok);
         }
@@ -68,8 +79,8 @@ impl<'a> Iterator for Lexer<'a> {
             };
 
             let produced = match next {
-                '\n' => Some(Newline),
-                '`' => Some(Tick),
+                '\n' => Some(Token::Newline),
+                '`' => Some(Token::Tick),
                 '<' => {
                     if self.src.peek_nth(0).map_or(false, |x| *x == '!')
                         && self.src.peek_nth(1).map_or(false, |x| *x == '-')
@@ -79,7 +90,7 @@ impl<'a> Iterator for Lexer<'a> {
                         self.src.next();
                         self.src.next();
 
-                        return Some(CommentOpen);
+                        return Some(Token::CommentOpen);
                     } else {
                         None
                     }
@@ -91,7 +102,7 @@ impl<'a> Iterator for Lexer<'a> {
                         self.src.next();
                         self.src.next();
 
-                        Some(CommentClose)
+                        Some(Token::CommentClose)
                     } else {
                         None
                     }
@@ -109,12 +120,4 @@ impl<'a> Iterator for Lexer<'a> {
             self.raw_acc.push(next);
         }
     }
-}
-
-/// Run a lexer on some character input.
-///
-///
-/// This will return an iterator living as long as the string data, and yielding tokens.
-pub fn lex<'a>(src: &'a str) -> impl Iterator<Item = Token> + 'a {
-    Lexer::new(src)
 }
