@@ -24,6 +24,23 @@ impl fmt::Display for Value {
     }
 }
 
+fn accumulate<A, T>(
+    args: Vec<Value>,
+    extract: impl Fn(Value) -> Option<T>,
+    init: A,
+    combine: impl Fn(A, T) -> A,
+    wrap: impl Fn(A) -> Value,
+) -> Value {
+    let mut acc = init;
+    for x in args {
+        match extract(x) {
+            None => return Value::Nil,
+            Some(v) => acc = combine(acc, v),
+        }
+    }
+    wrap(acc)
+}
+
 fn new_parser<'a>(code: &'a Code) -> parser::Parser<'a> {
     parser::Parser::new(lexer::Lexer::new(&code.0))
 }
@@ -45,11 +62,67 @@ impl Interpreter {
         self.values.insert(def.ident, val);
     }
 
+    fn call(&mut self, ident: Ident, args: Vec<Value>) -> Value {
+        match ident.0.as_str() {
+            "+" => accumulate(
+                args,
+                |x| match x {
+                    Value::Int(i) => Some(i),
+                    _ => None,
+                },
+                0,
+                |x, y| x + y,
+                |x| Value::Int(x),
+            ),
+            "*" => accumulate(
+                args,
+                |x| match x {
+                    Value::Int(i) => Some(i),
+                    _ => None,
+                },
+                1,
+                |x, y| x * y,
+                |x| Value::Int(x),
+            ),
+            "-" => accumulate(
+                args,
+                |x| match x {
+                    Value::Int(i) => Some(i),
+                    _ => None,
+                },
+                None,
+                |x, y| match x {
+                    None => Some(y),
+                    Some(acc) => Some(acc - y),
+                },
+                |x| Value::Int(x.unwrap_or(0)),
+            ),
+            "/" => accumulate(
+                args,
+                |x| match x {
+                    Value::Int(i) => Some(i),
+                    _ => None,
+                },
+                None,
+                |x, y| match x {
+                    None => Some(y),
+                    Some(acc) => Some(acc / y),
+                },
+                |x| Value::Int(x.unwrap_or(1)),
+            ),
+            _ => Value::Nil,
+        }
+    }
+
     fn eval_expr(&mut self, expr: Expr) -> Value {
         match expr {
             Expr::Nil => Value::Nil,
             Expr::Int(i) => Value::Int(i),
             Expr::Ident(i) => self.values.get(&i).unwrap_or(&Value::Nil).clone(),
+            Expr::Call(i, args) => {
+                let arg_values: Vec<Value> = args.into_iter().map(|a| self.eval_expr(a)).collect();
+                self.call(i, arg_values)
+            }
         }
     }
 

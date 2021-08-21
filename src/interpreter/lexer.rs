@@ -7,6 +7,10 @@ pub enum Token {
     Is,
     /// The `nil` keyword
     Nil,
+    /// (
+    OpenParens,
+    /// )
+    CloseParens,
     /// An identifier
     Identifier(String),
     // A signed integer
@@ -70,11 +74,13 @@ impl<'a> Iterator for Lexer<'a> {
         };
 
         match next {
+            '(' => return Some(Ok(Token::OpenParens)),
+            ')' => return Some(Ok(Token::CloseParens)),
             c if c.is_digit(10) => {
                 let lit = self.continue_int_lit(c);
                 return Some(Ok(Token::Int(lit)));
             }
-            c if c.is_alphabetic() || c == '_' => {
+            c if c.is_alphabetic() || "_+-/*".contains(c) => {
                 let ident = self.continue_identifier(c);
                 let tok = match ident.as_str() {
                     "is" => Token::Is,

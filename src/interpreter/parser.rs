@@ -3,13 +3,14 @@ use std::iter::Peekable;
 use crate::interpreter::lexer::{Lexer, Token};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Ident(String);
+pub struct Ident(pub String);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
-    Ident(Ident),
-    Int(i64),
     Nil,
+    Int(i64),
+    Ident(Ident),
+    Call(Ident, Vec<Expr>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -67,6 +68,32 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn ident(&mut self) -> ParseResult<Ident> {
+        self.expect(|x| match x {
+            Token::Identifier(i) => Some(Ident(i)),
+            _ => None,
+        })
+    }
+
+    fn call(&mut self) -> ParseResult<Expr> {
+        self.expect(|x| match x {
+            Token::OpenParens => Some(()),
+            _ => None,
+        })?;
+        let ident = self.ident()?;
+        let mut exprs = Vec::new();
+        loop {
+            match self.peek()? {
+                None => return Err(format!("unexpected EOF")),
+                Some(Token::CloseParens) => {
+                    self.next()?;
+                    return Ok(Expr::Call(ident, exprs));
+                }
+                Some(_) => exprs.push(self.expr()?),
+            }
+        }
+    }
+
     fn expr(&mut self) -> ParseResult<Expr> {
         match self.peek()? {
             None => Err(format!("unexpected EOF")),
@@ -83,15 +110,13 @@ impl<'a> Parser<'a> {
                 self.next()?;
                 Ok(Expr::Nil)
             }
+            Some(Token::OpenParens) => self.call(),
             Some(tok) => Err(format!("unexpected token {:?}", tok)),
         }
     }
 
     fn definition(&mut self) -> ParseResult<Definition> {
-        let ident = self.expect(|x| match x {
-            Token::Identifier(i) => Some(Ident(i)),
-            _ => None,
-        })?;
+        let ident = self.ident()?;
         self.expect(|x| match x {
             Token::Is => Some(()),
             _ => None,
