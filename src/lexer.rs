@@ -49,14 +49,6 @@ impl<'a> Lexer<'a> {
             Some(Token::Raw(mem::take(&mut self.raw_acc)))
         }
     }
-
-    fn finalize(self) -> Option<Token> {
-        if self.raw_acc.is_empty() {
-            None
-        } else {
-            Some(Token::Raw(self.raw_acc))
-        }
-    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
