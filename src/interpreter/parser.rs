@@ -14,9 +14,9 @@ pub enum Expr {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Definition {
-    pub ident: Ident,
-    pub expr: Expr,
+pub enum Definition {
+    Value(Ident, Expr),
+    Func(Ident, Vec<Ident>, Expr),
 }
 
 #[derive(Clone, Debug)]
@@ -115,14 +115,47 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn definition(&mut self) -> ParseResult<Definition> {
-        let ident = self.ident()?;
+    fn func_definition(&mut self) -> ParseResult<Definition> {
         self.expect(|x| match x {
-            Token::Is => Some(()),
+            Token::OpenParens => Some(()),
             _ => None,
         })?;
-        let expr = self.expr()?;
-        Ok(Definition { ident, expr })
+        let ident = self.ident()?;
+        let mut idents = Vec::new();
+        loop {
+            match self.peek()? {
+                None => return Err(format!("unexpected EOF")),
+                Some(Token::CloseParens) => {
+                    self.next()?;
+                    self.expect(|x| match x {
+                        Token::Is => Some(()),
+                        _ => None,
+                    })?;
+                    let expr = self.expr()?;
+                    return Ok(Definition::Func(ident, idents, expr));
+                }
+                Some(_) => idents.push(self.ident()?),
+            }
+        }
+    }
+
+    fn definition(&mut self) -> ParseResult<Definition> {
+        match self.peek()? {
+            None => Err(format!("unexpected EOF")),
+            Some(Token::Identifier(_)) => match self.next()? {
+                Some(Token::Identifier(i)) => {
+                    self.expect(|x| match x {
+                        Token::Is => Some(()),
+                        _ => None,
+                    })?;
+                    let expr = self.expr()?;
+                    Ok(Definition::Value(Ident(i), expr))
+                }
+                _ => unreachable!(),
+            },
+            Some(Token::OpenParens) => self.func_definition(),
+            Some(tok) => Err(format!("unexpected token {:?}", tok)),
+        }
     }
 
     pub fn top_level_expr(&mut self) -> ParseResult<Expr> {
