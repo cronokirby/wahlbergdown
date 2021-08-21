@@ -5,7 +5,7 @@ use crate::lexer::{Lexer, Token};
 
 /// Code represents a snippet of actual code.
 #[derive(Debug, PartialEq)]
-pub struct Code(String);
+pub struct Code(pub String);
 
 /// DocumentChunk represent an individual chunk composing our document.
 #[derive(Debug, PartialEq)]

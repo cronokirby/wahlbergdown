@@ -10,6 +10,8 @@ use lexer::Lexer;
 use parser::Parser;
 use structopt::StructOpt;
 
+use crate::parser::DocumentChunk;
+
 /// A command that our CLI can process
 #[derive(Debug, StructOpt)]
 enum Command {
@@ -52,7 +54,22 @@ fn parse_and_stop(input_file: &Path) {
 
 fn run(input_file: &Path) {
     let src = fs::read_to_string(input_file).expect("failed to read input file");
-    print!("{}", src)
+    let tokens = Lexer::new(&src);
+    let chunks = Parser::new(tokens);
+    let mut interpreter = interpreter::Interpreter::new();
+    for chunk in chunks {
+        match chunk {
+            DocumentChunk::Raw(r) => print!("{}", r),
+            DocumentChunk::Comment(c) => match interpreter.definition(c) {
+                Err(e) => print!("<!--ERROR: {}-->", e),
+                Ok(()) => {}
+            },
+            DocumentChunk::Interpolate(c) => match interpreter.expr(c) {
+                Err(e) => print!("`ERROR: {}`", e),
+                Ok(v) => print!("{}", v),
+            },
+        }
+    }
 }
 
 fn main() {

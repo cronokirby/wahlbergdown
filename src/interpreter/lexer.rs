@@ -14,7 +14,7 @@ pub enum Token {
 }
 
 /// A lexer produces tokens as an iterator.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Lexer<'a> {
     chars: Peekable<Chars<'a>>,
 }
