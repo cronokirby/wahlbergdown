@@ -253,6 +253,17 @@ impl Interpreter {
                 |x, y| x || y,
                 |x| Value::Int(if x { 1 } else { 0 }),
             ),
+            "not" => Value::Int(
+                if args
+                    .get(0)
+                    .map_or(Value::Nil, |x| self.eval_expr(None, x.clone()))
+                    .truthy()
+                {
+                    0
+                } else {
+                    1
+                },
+            ),
             "if" => {
                 let condition = args
                     .get(0)

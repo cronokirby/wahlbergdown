@@ -80,7 +80,18 @@ impl<'a> Iterator for Lexer<'a> {
 
             let produced = match next {
                 '\n' => Some(Token::Newline),
-                '`' => Some(Token::Tick),
+                '`' => if Some('`').as_ref() == self.src.peek() {
+                    self.src.next();
+                    if Some('`').as_ref() == self.src.peek() {
+                        self.src.next();
+                        self.raw_acc.push_str("``");
+                        None
+                    } else {
+                        Some(Token::Tick)
+                    }
+                } else {
+                    None
+                }
                 '<' => {
                     if self.src.peek_nth(0).map_or(false, |x| *x == '!')
                         && self.src.peek_nth(1).map_or(false, |x| *x == '-')
