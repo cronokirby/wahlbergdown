@@ -1,7 +1,7 @@
 mod lexer;
 mod parser;
 
-use std::{collections::HashMap, fmt, hash::Hash};
+use std::{collections::HashMap, fmt};
 
 use parser::{Definition, Expr};
 
@@ -228,6 +228,20 @@ impl Interpreter {
                     Some(acc) => (good && acc < y, Some(acc)),
                 },
                 |(good, _)| Value::Int(if good { 1 } else { 0 }),
+            ),
+            "and" => self.accumulate(
+                args,
+                |x| Some(x.truthy()),
+                true,
+                |x, y| x && y,
+                |x| Value::Int(if x { 1 } else { 0 }),
+            ),
+            "or" => self.accumulate(
+                args,
+                |x| Some(x.truthy()),
+                false,
+                |x, y| x || y,
+                |x| Value::Int(if x { 1 } else { 0 }),
             ),
             "if" => {
                 let condition = args
