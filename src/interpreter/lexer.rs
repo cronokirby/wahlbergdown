@@ -80,7 +80,7 @@ impl<'a> Iterator for Lexer<'a> {
                 let lit = self.continue_int_lit(c);
                 return Some(Ok(Token::Int(lit)));
             }
-            c if c.is_alphabetic() || "_+-/*".contains(c) => {
+            c if c.is_alphabetic() || "_+-/*<=>".contains(c) => {
                 let ident = self.continue_identifier(c);
                 let tok = match ident.as_str() {
                     "is" => Token::Is,

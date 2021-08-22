@@ -190,6 +190,45 @@ impl Interpreter {
                 },
                 |x| Value::Int(x.unwrap_or(1)),
             ),
+            "=" => self.accumulate(
+                args,
+                |x| match x {
+                    Value::Int(i) => Some(i),
+                    _ => None,
+                },
+                (true, None),
+                |(equal, x), y| match x {
+                    None => (true, Some(y)),
+                    Some(acc) => (equal && acc == y, Some(y)),
+                },
+                |(equal, _)| Value::Int(if equal { 1 } else { 0 }),
+            ),
+            ">" => self.accumulate(
+                args,
+                |x| match x {
+                    Value::Int(i) => Some(i),
+                    _ => None,
+                },
+                (true, None),
+                |(good, x), y| match x {
+                    None => (true, Some(y)),
+                    Some(acc) => (good && acc > y, Some(acc)),
+                },
+                |(good, _)| Value::Int(if good { 1 } else { 0 }),
+            ),
+            "<" => self.accumulate(
+                args,
+                |x| match x {
+                    Value::Int(i) => Some(i),
+                    _ => None,
+                },
+                (true, None),
+                |(good, x), y| match x {
+                    None => (true, Some(y)),
+                    Some(acc) => (good && acc < y, Some(acc)),
+                },
+                |(good, _)| Value::Int(if good { 1 } else { 0 }),
+            ),
             "if" => {
                 let condition = args
                     .get(0)
