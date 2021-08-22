@@ -1,7 +1,7 @@
 mod lexer;
 mod parser;
 
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, mem};
 
 use parser::{Definition, Expr};
 
@@ -83,6 +83,7 @@ impl Values {
 pub struct Interpreter {
     values: Values,
     funcs: HashMap<Ident, Function>,
+    tail_args: Option<Vec<Value>>,
 }
 
 impl Interpreter {
@@ -90,13 +91,14 @@ impl Interpreter {
         Self {
             values: Values::new(),
             funcs: HashMap::new(),
+            tail_args: None,
         }
     }
 
     fn eval_definition(&mut self, def: Definition) {
         match def {
             Definition::Value(i, e) => {
-                let v = self.eval_expr(e);
+                let v = self.eval_expr(None, e);
                 self.values.put(i, v);
             }
             Definition::Func(name, args, body) => {
@@ -115,7 +117,7 @@ impl Interpreter {
     ) -> Value {
         let mut acc = init;
         for x in args {
-            match extract(self.eval_expr(x)) {
+            match extract(self.eval_expr(None, x)) {
                 None => return Value::Nil,
                 Some(v) => acc = combine(acc, v),
             }
@@ -127,22 +129,30 @@ impl Interpreter {
         match self.funcs.get(&ident) {
             None => Value::Nil,
             Some(Function { args, body }) => {
+                let args = args.clone();
+                let body = body.clone();
+
+                self.tail_args = Some(arg_values);
                 self.values.enter();
-                for (i, arg_name) in args.iter().enumerate() {
-                    self.values.put(
-                        arg_name.clone(),
-                        arg_values.get(i).unwrap_or(&Value::Nil).clone(),
-                    )
+
+                let mut ret = Value::Nil;
+                while let Some(arg_values) = mem::take(&mut self.tail_args) {
+                    for (i, arg_name) in args.iter().enumerate() {
+                        self.values.put(
+                            arg_name.clone(),
+                            arg_values.get(i).unwrap_or(&Value::Nil).clone(),
+                        )
+                    }
+                    ret = self.eval_expr(Some(ident.clone()), body.clone());
                 }
-                let the_body = body.clone();
-                let ret = self.eval_expr(the_body);
+
                 self.values.exit();
                 ret
             }
         }
     }
 
-    fn call(&mut self, ident: Ident, args: Vec<Expr>) -> Value {
+    fn call(&mut self, current_func: Option<Ident>, ident: Ident, args: Vec<Expr>) -> Value {
         match ident.0.as_str() {
             "+" => self.accumulate(
                 args,
@@ -246,28 +256,33 @@ impl Interpreter {
             "if" => {
                 let condition = args
                     .get(0)
-                    .map_or(Value::Nil, |x| self.eval_expr(x.clone()));
+                    .map_or(Value::Nil, |x| self.eval_expr(None, x.clone()));
                 if condition.truthy() {
                     args.get(1)
-                        .map_or(Value::Nil, |x| self.eval_expr(x.clone()))
+                        .map_or(Value::Nil, |x| self.eval_expr(current_func, x.clone()))
                 } else {
                     args.get(2)
-                        .map_or(Value::Nil, |x| self.eval_expr(x.clone()))
+                        .map_or(Value::Nil, |x| self.eval_expr(current_func, x.clone()))
                 }
             }
             _ => {
-                let arg_values = args.into_iter().map(|x| self.eval_expr(x)).collect();
-                self.function_call(ident, arg_values)
+                let arg_values = args.into_iter().map(|x| self.eval_expr(None, x)).collect();
+                if Some(&ident) == current_func.as_ref() {
+                    self.tail_args = Some(arg_values);
+                    Value::Nil
+                } else {
+                    self.function_call(ident, arg_values)
+                }
             }
         }
     }
 
-    fn eval_expr(&mut self, expr: Expr) -> Value {
+    fn eval_expr(&mut self, current_func: Option<Ident>, expr: Expr) -> Value {
         match expr {
             Expr::Nil => Value::Nil,
             Expr::Int(i) => Value::Int(i),
             Expr::Ident(i) => self.values.get(i),
-            Expr::Call(i, args) => self.call(i, args),
+            Expr::Call(i, args) => self.call(current_func, i, args),
         }
     }
 
@@ -278,6 +293,6 @@ impl Interpreter {
 
     pub fn expr(&mut self, code: Code) -> Result<Value, String> {
         let expr = new_parser(&code).top_level_expr()?;
-        Ok(self.eval_expr(expr))
+        Ok(self.eval_expr(None, expr))
     }
 }
